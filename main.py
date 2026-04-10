@@ -2,94 +2,144 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import os
 import datetime
+import json
 
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-user_input = input("What is something you would like to study: ")
+while True:
+    choice = input("Please Choose:\n1. New Quiz\n2. View History\n3.Quit\n\n")
 
-system_message = """ You are a helpful study buddy asking 5 questions about a topic the user chooses.
-Return the questions in a numbered list format.
-Do not provide any answers or any extra text
+    if choice == "1":
+        user_input = input("What is something you would like to study: ")
 
-If the user ask a question that is inappropriate or explicit replay: "Sorry that is inappropriate. Would you like to ask another question."
-"""
+        system_message = """ You are a helpful study buddy asking 5 questions about a topic the user chooses.
+        Return the questions in a numbered list format.
+        Do not provide any answers or any extra text
 
-response = client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages = [
-        {"role": "system", "content": system_message},
-        {"role": "user", "content": user_input}
-    ]
-)
+        If the user ask a question that is inappropriate or explicit replay: "Sorry that is inappropriate. Would you like to ask another question."
+        """
 
-question = response.choices[0].message.content
+        # response = client.chat.completions.create(
+        #     model="gpt-4o-mini",
+        #     messages = [
+        #         {"role": "system", "content": system_message},
+        #         {"role": "user", "content": user_input}
+        #     ]
+        # )
 
-# question = """1. What are the different types of loops available in Python, and how do they differ from each other?
-# 2. How does a `for` loop work in Python, and when would you use it?
-# 3. Can you explain the purpose of a `while` loop and provide an example to illustrate its usage?
-# 4. What is the `break` statement in loops, and how can it be used to control loop execution?
-# 5. How can you use the `continue` statement in a loop, and what effect does it have on loop iterations?"""
+        # question = response.choices[0].message.content
 
-lines = question.split("\n")
-cleaned_questions = []
+        question = """1. What are the different types of loops available in Python, and how do they differ from each other?
+        2. How does a `for` loop work in Python, and when would you use it?
+        3. Can you explain the purpose of a `while` loop and provide an example to illustrate its usage?
+        4. What is the `break` statement in loops, and how can it be used to control loop execution?
+        5. How can you use the `continue` statement in a loop, and what effect does it have on loop iterations?"""
 
-for line in lines:
-    if line.strip():
-        parts = line.split(".", 1)
-        if len(parts)>1:
-            cleaned = parts[1].strip()
-            cleaned_questions.append(cleaned)
+        lines = question.split("\n")
+        cleaned_questions = []
 
-user_answers = []
+        for line in lines:
+            if line.strip():
+                parts = line.split(".", 1)
+                if len(parts)>1:
+                    cleaned = parts[1].strip()
+                    cleaned_questions.append(cleaned)
 
-for i, q in enumerate(cleaned_questions):
-    print(f"Q{i+1}: {q}")
-    answer = input("> ")
-    user_answers.append(answer)
+        user_answers = []
 
-qa_string = ""
+        for i, q in enumerate(cleaned_questions):
+            print(f"Q{i+1}: {q}")
+            answer = input("> ")
+            user_answers.append(answer)
 
-for i in range(len(cleaned_questions)):
-    qa_string += f"Q{i+1}: {cleaned_questions[i]}\nA{i+1}: {user_answers[i]}\n-----\n\n"
+        qa_string = ""
+
+        for i in range(len(cleaned_questions)):
+            qa_string += f"Q{i+1}: {cleaned_questions[i]}\nA{i+1}: {user_answers[i]}\n-----\n\n"
 
 
-feedback_system_msg = """You are a teacher providing feedback to the answers provided by a student.
-Give a grade out of 5.
-Provide feedback to the student.
+        feedback_system_msg = """You are a teacher providing feedback to the answers provided by a student.
+        Give a grade out of 5.
+        Provide feedback to the student.
 
-Score:
-Feedback:
+        Score:
+        Feedback:
 
-Be encouraging but honest.
-"""
+        Be encouraging but honest.
+        """
 
-res = client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages = [
-        {"role": "system", "content": feedback_system_msg},
-        {"role": "user", "content": qa_string}
-    ]
-)
+        # res = client.chat.completions.create(
+        #     model="gpt-4o-mini",
+        #     messages = [
+        #         {"role": "system", "content": feedback_system_msg},
+        #         {"role": "user", "content": qa_string}
+        #     ]
+        # )
 
-feedback = res.choices[0].message.content
+        # feedback = res.choices[0].message.content
 
-#feedback = "great"
+        feedback = "great"
 
-print("===== QUIZ RESULTS =====")
-print(qa_string)
-print("===== FEEDBACK =====")
-print(feedback)
+        quiz_data = {
+            "topic": user_input,
+            "questions": cleaned_questions,
+            "answers": user_answers,
+            "feedback": feedback,
+            "score": None,
+            "date": str(datetime.datetime.now())
+        }
 
-with open("quiz_history.txt", "a") as file:
-    file.write("===== QUIZ SESSION =====\n")
-    file.write(f"Topic: {user_input}\n\n")
+        print("===== QUIZ RESULTS =====")
+        print(qa_string)
+        print("===== FEEDBACK =====")
+        print(feedback)
 
-    file.write("===== QUESTIONS & ANSWERS =====\n")
-    file.write(f"{qa_string}\n\n")
+        file_path = "quiz_history.json"
 
-    file.write("===== FEEDBACK =====\n")
-    file.write(feedback)
-    file.write(f"\nDate: {datetime.datetime.now()}\n")
-    file.write("\n\n========================\n\n")
+        if os.path.exists(file_path):
+            with open(file_path, "r") as file:
+                try:
+                    data = json.load(file)
+                except:
+                    data = []
+        else:
+            data = []
+
+        data.append(quiz_data)
+
+        with open(file_path, "w") as file:
+            json.dump(data, file, indent=4)
+
+    elif choice == "2":
+        file_path = "quiz_history.json"
+        if os.path.exists(file_path):
+            with open(file_path, "r") as file:
+                try:
+                    data = json.load(file)
+                except:
+                    data = []
+        else:
+            data = []
+        
+        if not data:
+            print("No History Available Yet.")
+        else:
+            for i, quiz in enumerate(data):
+                print(f"===== QUIZ {i+1} =====\n")
+                print(quiz["topic"])
+
+                for j in range(len(quiz["questions"])):
+                    print(f'Q{j+1}: {quiz["questions"][j]}')
+                    print(f'A{j+1}: {quiz["answers"][j]}\n')
+                
+                print(f'Feedback: {quiz["feedback"]}')
+                print(f'Score: {quiz["score"]}')
+                print(quiz["date"])
+                print("============\n")
+    elif choice == "3":
+        break
+    else:
+        print("Invalid Choice")
+        
