@@ -7,80 +7,123 @@ import json
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+FILE_PATH = "quiz_history.json"
+
+
+def load_history():
+    if os.path.exists(FILE_PATH):
+        with open(FILE_PATH, "r") as file:
+            try:
+                return json.load(file)
+            except:
+                return []
+    return []
+
+
+def save_history(data):
+    with open(FILE_PATH, "w") as file:
+        json.dump(data, file, indent=4)
+
+
+def parse_questions(question_text):
+    lines = question_text.split("\n")
+    cleaned = []
+
+    for line in lines:
+        if line.strip():
+            parts = line.split(".", 1)
+            if len(parts) > 1:
+                cleaned.append(parts[1].strip())
+
+    return cleaned
+
+
+def extract_weak_questions(feedback):
+    weak = []
+
+    if "[" in feedback and "]" in feedback:
+        start = feedback.index("[")
+        end = feedback.index("]")
+
+        numbers_str = feedback[start + 1:end]
+        parts = numbers_str.split(",")
+
+        for p in parts:
+            p = p.strip()
+            if p:
+                weak.append(int(p))
+
+    return weak
+
+
 
 while True:
-    choice = input("Please Choose:\n1. New Quiz\n2. View History\n3.Quit\n\n")
+    choice = input(
+        "\nPlease Choose:\n1. New Quiz\n2. View History\n3. Quit\n> "
+    )
+
 
     if choice == "1":
-        user_input = input("What is something you would like to study: ")
+        user_input = input("\nWhat would you like to study? ")
 
-        system_message = """ You are a helpful study buddy asking 5 questions about a topic the user chooses.
-        Return the questions in a numbered list format.
-        Do not provide any answers or any extra text
+        system_message = """
+You are a helpful study buddy.
+Ask 5 questions about the user's topic.
 
-        If the user ask a question that is inappropriate or explicit replay: "Sorry that is inappropriate. Would you like to ask another question."
-        """
+Rules:
+- Return only numbered questions
+- No answers
+"""
 
-        # response = client.chat.completions.create(
-        #     model="gpt-4o-mini",
-        #     messages = [
-        #         {"role": "system", "content": system_message},
-        #         {"role": "user", "content": user_input}
-        #     ]
-        # )
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_input}
+            ]
+        )
 
-        # question = response.choices[0].message.content
-
-        question = """1. What are the different types of loops available in Python, and how do they differ from each other?
-        2. How does a `for` loop work in Python, and when would you use it?
-        3. Can you explain the purpose of a `while` loop and provide an example to illustrate its usage?
-        4. What is the `break` statement in loops, and how can it be used to control loop execution?
-        5. How can you use the `continue` statement in a loop, and what effect does it have on loop iterations?"""
-
-        lines = question.split("\n")
-        cleaned_questions = []
-
-        for line in lines:
-            if line.strip():
-                parts = line.split(".", 1)
-                if len(parts)>1:
-                    cleaned = parts[1].strip()
-                    cleaned_questions.append(cleaned)
+        question_text = response.choices[0].message.content
+        cleaned_questions = parse_questions(question_text)
 
         user_answers = []
 
         for i, q in enumerate(cleaned_questions):
-            print(f"Q{i+1}: {q}")
-            answer = input("> ")
-            user_answers.append(answer)
+            print(f"\nQ{i+1}: {q}")
+            user_answers.append(input("> "))
 
         qa_string = ""
-
         for i in range(len(cleaned_questions)):
             qa_string += f"Q{i+1}: {cleaned_questions[i]}\nA{i+1}: {user_answers[i]}\n-----\n\n"
 
+        feedback_system_msg = """
+You are a teacher grading a quiz.
 
-        feedback_system_msg = """You are a teacher providing feedback to the answers provided by a student.
-        Give a grade out of 5.
-        Provide feedback to the student.
+Return:
+Score (out of 5)
+Feedback
+Weak questions in format: [1, 3]
 
-        Score:
-        Feedback:
+Be clear and encouraging.
+"""
 
-        Be encouraging but honest.
-        """
+        res = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": feedback_system_msg},
+                {"role": "user", "content": qa_string}
+            ]
+        )
 
-        # res = client.chat.completions.create(
-        #     model="gpt-4o-mini",
-        #     messages = [
-        #         {"role": "system", "content": feedback_system_msg},
-        #         {"role": "user", "content": qa_string}
-        #     ]
-        # )
+        feedback = res.choices[0].message.content
 
-        # feedback = res.choices[0].message.content
+        weak_questions = extract_weak_questions(feedback)
 
-        feedback = "great"
+  
+        for q_num in weak_questions:
+            print(f"\nRetry Q{q_num}: {cleaned_questions[q_num - 1]}")
+            new_answer = input("> ")
+            user_answers[q_num - 1] = new_answer
 
         quiz_data = {
             "topic": user_input,
@@ -91,55 +134,37 @@ while True:
             "date": str(datetime.datetime.now())
         }
 
-        print("===== QUIZ RESULTS =====")
+        print("\n===== QUIZ RESULTS =====")
         print(qa_string)
-        print("===== FEEDBACK =====")
+        print("\n===== FEEDBACK =====")
         print(feedback)
 
-        file_path = "quiz_history.json"
-
-        if os.path.exists(file_path):
-            with open(file_path, "r") as file:
-                try:
-                    data = json.load(file)
-                except:
-                    data = []
-        else:
-            data = []
-
-        data.append(quiz_data)
-
-        with open(file_path, "w") as file:
-            json.dump(data, file, indent=4)
+        history = load_history()
+        history.append(quiz_data)
+        save_history(history)
 
     elif choice == "2":
-        file_path = "quiz_history.json"
-        if os.path.exists(file_path):
-            with open(file_path, "r") as file:
-                try:
-                    data = json.load(file)
-                except:
-                    data = []
-        else:
-            data = []
-        
+        data = load_history()
+
         if not data:
-            print("No History Available Yet.")
+            print("\nNo History Available Yet.")
         else:
             for i, quiz in enumerate(data):
-                print(f"===== QUIZ {i+1} =====\n")
-                print(quiz["topic"])
+                print(f"\n===== QUIZ {i+1} =====")
+                print(f"Topic: {quiz['topic']}\n")
 
                 for j in range(len(quiz["questions"])):
-                    print(f'Q{j+1}: {quiz["questions"][j]}')
-                    print(f'A{j+1}: {quiz["answers"][j]}\n')
-                
-                print(f'Feedback: {quiz["feedback"]}')
-                print(f'Score: {quiz["score"]}')
-                print(quiz["date"])
-                print("============\n")
+                    print(f"Q{j+1}: {quiz['questions'][j]}")
+                    print(f"A{j+1}: {quiz['answers'][j]}\n")
+
+                print(f"Feedback: {quiz['feedback']}")
+                print(f"Score: {quiz['score']}")
+                print(f"Date: {quiz['date']}")
+                print("====================")
+
     elif choice == "3":
+        print("Goodbye 👋")
         break
+
     else:
         print("Invalid Choice")
-        
