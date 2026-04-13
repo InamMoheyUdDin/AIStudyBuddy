@@ -32,13 +32,13 @@ function App() {
     setAnswers(newAnswers)
   }
 
-  const handleSubmit = async ()=>{
-    console.log({
-        topic: topic,
-        questions: questions,
-        answers: answers
-      })
-    const response = await fetch("http://127.0.0.1:8000/submit",{
+  const handleSubmit = async () => {
+    if (answers.some(a => a.trim() === "")) {
+      alert("Please answer all questions before submitting.")
+      return
+    }
+    
+    const response = await fetch("http://127.0.0.1:8000/submit", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -61,12 +61,11 @@ function App() {
       <input className="topic-input" placeholder='Enter Topic' onChange={(e) => setTopic(e.target.value)} name="topic" value={topic} />
       <button className="btn" onClick={handleGenerateQuiz} disabled={!topic}>Generate Quiz</button>
       {questions.map((q, index) => (
-        <div className={`question-card ${
-      weakQuestions.includes(index + 1) ? "weak" : ""
-    }`} key={index}
-        style = {{
-          color: weakQuestions.includes(index+1) ? "#ff0000" : "black"
-        }}
+        <div className={`question-card ${weakQuestions.includes(index + 1) ? "weak" : ""
+          }`} key={index}
+          style={{
+            color: weakQuestions.includes(index + 1) ? "#ff0000" : "black"
+          }}
         >
           <p className="question-text">Q{index + 1}: {q}</p>
           <input className="answer-input"
@@ -78,14 +77,14 @@ function App() {
         </div>
 
       ))}
-      <button className="btn submit" onClick={handleSubmit}>Submit Answers</button>
+      <button className="btn submit" disabled={answers.some(a => a.trim() === "")} onClick={handleSubmit}>Submit Answers</button>
       {feedback && (
         <div className="feedback-box">
           <p><strong>Feedback: {feedback}</strong></p>
           {weakQuestions.length > 0 && (
             <p className="weak-text">Review these questions: {weakQuestions.join(", ")}</p>
           )}
-          
+
           {/* {weakQuestions.map((q, index)=>{
             <p key="{index}">Q: {q}</p>
           })} */}
