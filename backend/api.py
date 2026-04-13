@@ -11,7 +11,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # later restrict this
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -22,7 +22,7 @@ class QuizRequest(BaseModel):
 
 class SubmitRequest(BaseModel):
     topic: str = Field(...)
-    qestions: List[str] = Field(...)
+    questions: List[str] = Field(...)
     answers: List[str] = Field(...)
 
 
@@ -46,14 +46,16 @@ def gen_questions(request: QuizRequest):
 
 @app.post("/submit")
 def submit_request(request: SubmitRequest):
+   
     qa_string = ""
 
     if len(request.questions) != len(request.answers):
         return {"error": "Questions and answers count must match"}
 
-    for i in range(len(request.qestions)):
+    for i in range(len(request.questions)):
         qa_string += f"Q{i+1}: {request.questions[i]}\n"
         qa_string += f"A{i+1}: {request.answers[i]}\n\n"
+
 
     feedback = grade_quiz(qa_string)
     weak_questions = extract_weak_questions(feedback)
@@ -62,7 +64,7 @@ def submit_request(request: SubmitRequest):
     history.append(
         {
             "topic": request.topic,
-            "questions": request.qestions,
+            "questions": request.questions,
             "answers": request.answers,
             "feedback": feedback,
             "score": None,
